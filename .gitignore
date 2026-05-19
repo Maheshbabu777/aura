@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# Environment variables
+.env
+.env.local
+*.key
+
+# ChromaDB
+chromadb/
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Validation results
+validation_results.json
