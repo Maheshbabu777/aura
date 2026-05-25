@@ -4,8 +4,8 @@
 
 AURA is a privacy-first, autonomous personal AI assistant that runs locally on consumer laptops (16GB RAM). It monitors Gmail and Calendar, tracks long-term goals with adaptive replanning, and operates autonomously via scheduled heartbeat tasks.
 
-**Current Status**: Week 3 Complete (Memory Features Complete)  
-**Next Phase**: Week 4 - TBD  
+**Current Status**: Week 4 Complete (Orchestrator + API Ready)  
+**Next Phase**: Week 5 - Gmail Integration  
 **Timeline**: 22 weeks total
 
 ## Technology Stack
@@ -183,6 +183,36 @@ aura/
 - Priority scoring: 0-100 points based on importance, recency, access frequency, staleness penalty
 - Access tracking: `access_count` and `last_accessed_at` fields
 
+### Week 4: Orchestrator + API ✅
+- ✅ Built OrchestratorAgent with intent classification
+- ✅ Load prompts from files at runtime
+- ✅ Route complex intents to Gemini 3 Flash
+- ✅ Built FastAPI app with /chat, /logs, /health endpoints
+- ✅ End-to-end test: question → orchestrator → memory agent → answer
+- ✅ 14 orchestrator tests passing
+- ✅ 91% test coverage (exceeds >50% decision gate)
+- ✅ Created docs/architecture.md
+
+**Key Decisions**:
+- Local-first: Gemma E4B for routine classification
+- Cloud escalation: Gemini 3 Flash for complex reasoning
+- Dual model clients: Ollama (local) + Google AI (cloud)
+- Structured prompt parsing: INTENT/AGENT/ENTITIES/REASONING format
+- FastAPI with CORS for future frontend integration
+- ✅ Implement staleness detection with TTL
+- ✅ Add memory tagging system with auto-tagging
+- ✅ Build memory deduplication using ChromaDB embeddings
+- ✅ Memory prioritization logic (importance + recency + access frequency)
+- ✅ All 57 new tests passing (9 staleness + 16 tagging + 15 deduplication + 17 prioritization)
+
+**Key Features**:
+- TTL-based staleness detection with `is_stale()` check
+- Auto-tagging from content patterns (work, personal, urgent, education)
+- Tag search with AND/OR logic
+- Deduplication using similarity threshold (default 0.95)
+- Priority scoring: 0-100 points based on importance, recency, access frequency, staleness penalty
+- Access tracking: `access_count` and `last_accessed_at` fields
+
 ## Common Commands
 
 ### Development
@@ -236,7 +266,7 @@ git branch -d feature/week3-memory-staleness
 - Keep concise (not verbose)
 - Always add co-author: `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
 
-**Current Branch**: `main` (Week 3 merged)
+**Current Branch**: `feature/week4-orchestrator`
 
 ## Architecture Principles
 
