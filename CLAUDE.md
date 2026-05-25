@@ -4,8 +4,8 @@
 
 AURA is a privacy-first, autonomous personal AI assistant that runs locally on consumer laptops (16GB RAM). It monitors Gmail and Calendar, tracks long-term goals with adaptive replanning, and operates autonomously via scheduled heartbeat tasks.
 
-**Current Status**: Week 1 Complete (Tool Calling Validation Passed at 82.5%)  
-**Next Phase**: Week 2 - Memory Agent Implementation  
+**Current Status**: Week 2 Complete (Memory System Implemented)  
+**Next Phase**: Week 3 - Memory Staleness + Entity Tagging  
 **Timeline**: 22 weeks total
 
 ## Technology Stack
@@ -154,13 +154,25 @@ aura/
 - Removed `classify_task` and `classify_action` tools (orchestrator handles classification internally)
 - Kept 6 core tools: store_memory, search_memory, update_memory, get_calendar, search_emails, schedule_reminder
 
-### Week 2: Memory Agent (Current) 🔄
-- [ ] Set up ChromaDB in persistent mode
-- [ ] Build MemoryAgent with write_memory and search_memory
-- [ ] Connect to LangGraph orchestrator as tool
-- [ ] Add loguru structured logging
-- [ ] Test persistence across sessions
-- [ ] Create pytest fixtures
+### Week 2: Memory Agent ✅
+- ✅ Set up ChromaDB + SQLite dual-database architecture
+- ✅ Built MemoryStore with CRUD operations
+- ✅ Built MemoryAgent with smart explicit intent detection
+- ✅ Natural language understanding (store/search/update intents)
+- ✅ Entity type auto-classification (Person/Goal/Job/Location/Fact)
+- ✅ All 22 tests passing (8 MemoryStore + 14 MemoryAgent)
+- ✅ Documented architecture in week2-memory-system-explained.md
+
+**Key Decisions**:
+- Smart explicit intent detection using pattern matching
+- Dual-database: ChromaDB for semantic search, SQLite for structured queries
+- Auto entity classification from natural language
+
+### Week 3: Memory Staleness + Entity Tagging (Current) 🔄
+- [ ] Implement staleness detection with TTL
+- [ ] Add memory tagging system
+- [ ] Build memory deduplication
+- [ ] Memory prioritization logic
 
 ## Common Commands
 
@@ -183,9 +195,39 @@ python backend/api/main.py
 ```
 
 ### Git Workflow
-- Main branch: `main`
-- Commit messages: descriptive, present tense
-- Co-authored by: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+**Branch Strategy**:
+- `main` - Stable, tested code only
+- `feature/<week-name>` - Development branches for each week
+- Never work directly on main after initial setup
+
+**Standard Workflow**:
+```bash
+# Start new feature
+git checkout main
+git pull
+git checkout -b feature/week3-memory-staleness
+
+# Work, commit, test
+git add <files>
+git commit -m "feat: description"
+
+# Push and create PR when ready
+git push -u origin feature/week3-memory-staleness
+# Then create PR on GitHub: feature/week3-memory-staleness → main
+
+# After PR merged, cleanup
+git checkout main
+git pull
+git branch -d feature/week3-memory-staleness
+```
+
+**Commit Message Format**:
+- Format: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`
+- Keep concise (not verbose)
+- Always add co-author: `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
+
+**Current Branch**: `feature/week3-memory-staleness`
 
 ## Architecture Principles
 
