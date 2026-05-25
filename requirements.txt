@@ -1,0 +1,18 @@
+# Week 1 Core Dependencies
+langgraph>=0.2.0
+fastapi>=0.111.0
+chromadb>=0.5.0
+cryptography
+python-dotenv
+loguru
+pytest
+pytest-cov
+requests
+
+# Additional dependencies for FastAPI
+uvicorn[standard]
+pydantic>=2.0.0
+
+# For LangChain/LangGraph
+langchain-core
+langchain-community
