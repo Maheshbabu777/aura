@@ -4,8 +4,8 @@
 
 AURA is a privacy-first, autonomous personal AI assistant that runs locally on consumer laptops (16GB RAM). It monitors Gmail and Calendar, tracks long-term goals with adaptive replanning, and operates autonomously via scheduled heartbeat tasks.
 
-**Current Status**: Week 2 Complete (Memory System Implemented)  
-**Next Phase**: Week 3 - Memory Staleness + Entity Tagging  
+**Current Status**: Week 3 Complete (Memory Features Complete)  
+**Next Phase**: Week 4 - TBD  
 **Timeline**: 22 weeks total
 
 ## Technology Stack
@@ -168,11 +168,20 @@ aura/
 - Dual-database: ChromaDB for semantic search, SQLite for structured queries
 - Auto entity classification from natural language
 
-### Week 3: Memory Staleness + Entity Tagging (Current) 🔄
-- [ ] Implement staleness detection with TTL
-- [ ] Add memory tagging system
-- [ ] Build memory deduplication
-- [ ] Memory prioritization logic
+### Week 3: Memory Staleness + Entity Tagging ✅
+- ✅ Implement staleness detection with TTL
+- ✅ Add memory tagging system with auto-tagging
+- ✅ Build memory deduplication using ChromaDB embeddings
+- ✅ Memory prioritization logic (importance + recency + access frequency)
+- ✅ All 57 new tests passing (9 staleness + 16 tagging + 15 deduplication + 17 prioritization)
+
+**Key Features**:
+- TTL-based staleness detection with `is_stale()` check
+- Auto-tagging from content patterns (work, personal, urgent, education)
+- Tag search with AND/OR logic
+- Deduplication using similarity threshold (default 0.95)
+- Priority scoring: 0-100 points based on importance, recency, access frequency, staleness penalty
+- Access tracking: `access_count` and `last_accessed_at` fields
 
 ## Common Commands
 
@@ -227,7 +236,7 @@ git branch -d feature/week3-memory-staleness
 - Keep concise (not verbose)
 - Always add co-author: `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
 
-**Current Branch**: `feature/week3-memory-staleness`
+**Current Branch**: `main` (Week 3 merged)
 
 ## Architecture Principles
 
