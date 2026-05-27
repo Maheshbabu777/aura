@@ -41,13 +41,18 @@ class OllamaClient:
         payload = {
             "model": self.model,
             "prompt": prompt,
-            "system": system,
             "stream": False,
             "options": {
                 "temperature": temperature,
-                "num_predict": max_tokens,
             },
         }
+
+        # Only add system prompt if provided (Gemma E2B doesn't like null system)
+        if system:
+            payload["system"] = system
+
+        # NOTE: num_predict causes Gemma E2B to return empty responses with certain prompts
+        # Let the model use its default token limit instead
 
         try:
             logger.debug(f"Ollama request: {self.model} | prompt length: {len(prompt)}")
