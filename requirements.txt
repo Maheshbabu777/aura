@@ -17,6 +17,9 @@ pydantic-settings>=2.0.0
 # Google Gemini API
 google-generativeai>=0.3.0
 
+# Google OAuth for Gmail/Calendar
+google-auth-oauthlib>=1.0.0
+
 # For LangChain/LangGraph
 langchain-core
 langchain-community

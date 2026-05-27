@@ -4,8 +4,8 @@
 
 AURA is a privacy-first, autonomous personal AI assistant that runs locally on consumer laptops (16GB RAM). It monitors Gmail and Calendar, tracks long-term goals with adaptive replanning, and operates autonomously via scheduled heartbeat tasks.
 
-**Current Status**: Week 4 Complete (Orchestrator + API Ready)  
-**Next Phase**: Week 5 - Gmail Integration  
+**Current Status**: Week 5 Complete (Gmail Integration + Email Triage)  
+**Next Phase**: Week 6 - Calendar + Morning Brief  
 **Timeline**: 22 weeks total
 
 ## Technology Stack
@@ -17,10 +17,11 @@ AURA is a privacy-first, autonomous personal AI assistant that runs locally on c
 - **Task Scheduler**: APScheduler 3.10.x
 
 ### AI Models
-- **Local Model**: Gemma 4 E4B via Ollama (4-bit quantized, ~5GB RAM)
+- **Local Model**: Gemma 4 E2B via Ollama (4-bit quantized, ~5GB RAM)
   - Model name: `gemma4:e2b`
   - Used for: Tool calling, classification, routine tasks
   - Base URL: `http://localhost:11434`
+  - **Known Issue**: `num_predict` parameter causes empty responses - omit and use default token limits
 - **Cloud Model**: Gemini 3 Flash (Google AI API)
   - Used for: Complex reasoning, brief generation
   - Target cost: ~$0.24/year
@@ -74,10 +75,8 @@ See `requirements.txt` for full list. Core dependencies:
 - loguru
 - pytest, pytest-cov
 - requests
-
 ## Project Structure
 
-```
 aura/
 ├── backend/
 │   ├── agents/           # LangGraph agents (orchestrator, memory, goal, task, etc.)
@@ -194,24 +193,35 @@ aura/
 - ✅ Created docs/architecture.md
 
 **Key Decisions**:
-- Local-first: Gemma E4B for routine classification
+- Local-first: Gemma E2B for routine classification
 - Cloud escalation: Gemini 3 Flash for complex reasoning
 - Dual model clients: Ollama (local) + Google AI (cloud)
 - Structured prompt parsing: INTENT/AGENT/ENTITIES/REASONING format
 - FastAPI with CORS for future frontend integration
-- ✅ Implement staleness detection with TTL
-- ✅ Add memory tagging system with auto-tagging
-- ✅ Build memory deduplication using ChromaDB embeddings
-- ✅ Memory prioritization logic (importance + recency + access frequency)
-- ✅ All 57 new tests passing (9 staleness + 16 tagging + 15 deduplication + 17 prioritization)
+
+### Week 5: Gmail Integration + Email Triage ✅
+- ✅ Built Gmail API integration with OAuth 2.0
+- ✅ Email triage agent with classification (urgent/normal/ignore)
+- ✅ Guardrails system with Green/Yellow/Red action rules
+- ✅ Store urgent email summaries in memory
+- ✅ 26 new tests passing (16 guardrails + 10 email triage)
+- ✅ Real Gmail testing with OAuth credentials
+- ✅ Fixed Gemma E2B empty response bug (num_predict parameter issue)
 
 **Key Features**:
-- TTL-based staleness detection with `is_stale()` check
-- Auto-tagging from content patterns (work, personal, urgent, education)
-- Tag search with AND/OR logic
-- Deduplication using similarity threshold (default 0.95)
-- Priority scoring: 0-100 points based on importance, recency, access frequency, staleness penalty
-- Access tracking: `access_count` and `last_accessed_at` fields
+- Gmail OAuth flow with token persistence (credentials/gmail_credentials.json + gmail_token.json)
+- Fetch and classify unread emails using Gemma E2B locally
+- Priority scoring (1-5) with reasoning
+- Automatic memory storage for urgent emails
+- Action classification: read (GREEN), draft (YELLOW), send (RED)
+- Tested with real Gmail account (mrwantsup@gmail.com)
+
+**Key Decisions**:
+- OAuth 2.0 consent screen in "Testing" mode with approved test users
+- Local Gemma E2B for email classification (cost-free, privacy-first)
+- Fixed: Removed num_predict from Ollama calls to avoid empty responses
+- Token auto-refresh with 180s timeout for slow networks
+
 
 ## Common Commands
 
@@ -226,8 +236,14 @@ python tools/validate_tool_calling.py
 # Test Ollama connectivity
 python tools/test_ollama.py
 
-# Run tests (future)
-pytest tests/ -v --cov=backend
+# Run tests
+pytest backend/tests/ -v --cov=backend
+
+# Test Gmail authentication
+python tools/test_gmail_auth.py
+
+# Test email triage (requires Ollama running)
+python tools/test_email_triage_live.py
 
 # Start backend (future)
 python backend/api/main.py
@@ -266,12 +282,12 @@ git branch -d feature/week3-memory-staleness
 - Keep concise (not verbose)
 - Always add co-author: `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
 
-**Current Branch**: `feature/week4-orchestrator`
+**Current Branch**: `feature/week5-gmail-integration`
 
 ## Architecture Principles
 
 ### Core Design Decisions
-1. **Local-first**: Gemma E4B handles most tasks locally
+1. **Local-first**: Gemma E2B handles most tasks locally
 2. **Cloud escalation**: Complex reasoning → Gemini 3 Flash
 3. **Autonomous operation**: Scheduled tasks run without user intervention
 4. **Full transparency**: Every action logged and visible in dashboard
@@ -338,7 +354,9 @@ Agent     Agent     Agent     Agent
 
 ### Known Issues
 - Ollama timeout increased to 120s (model loading can be slow)
-- First Gemma E4B call takes ~10-30s (model loading)
+- First Gemma E2B call takes ~10-30s (model loading)
+- **IMPORTANT**: Do NOT use `num_predict` parameter with Gemma E2B - causes empty responses
+- SSL certificate issues on Windows: Set `SSL_CERT_FILE=$(python -c "import certifi; print(certifi.where())")`
 
 ## References
 

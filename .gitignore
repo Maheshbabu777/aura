@@ -12,10 +12,15 @@ build/
 dist/
 *.egg-info/
 
-# Environment variables
+# Environment variables and secrets
 .env
 .env.local
 *.key
+*.pem
+*.cert
+*_secret*
+*_token*
+api_key*
 
 # ChromaDB
 chromadb/
@@ -41,3 +46,15 @@ htmlcov/
 
 # Validation results
 validation_results.json
+
+# OAuth credentials and tokens
+credentials/
+
+# Memory data
+data/
+
+# Claude Code cache
+.claude/
+
+# Temporary test files
+test_payload.json
