@@ -40,6 +40,7 @@ class Goal(BaseModel):
     id: str
     title: str
     description: Optional[str] = None
+    context: Optional[str] = None
     status: str = Field(default="active", description="active, completed, paused, abandoned")
     progress_pct: int = Field(default=0, ge=0, le=100)
     created_at: str

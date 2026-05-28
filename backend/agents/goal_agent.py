@@ -29,20 +29,21 @@ class GoalAgent:
             logger.error(f"Failed to load GoalAgent prompt from {self.prompt_path}: {e}")
             return "You are a helpful AI assistant."
 
-    def create_goal(self, title: str, description: str = "", deadline: str = None) -> Goal:
+    def create_goal(self, title: str, description: str = "", context: str = "", deadline: str = None) -> Goal:
         """
-        Takes a natural language goal, decomposes it using the LLM, and saves it.
+        Takes a natural language goal and context, decomposes it using the LLM, and saves it.
         """
         logger.info(f"GoalAgent decomposing new goal: {title}")
 
-        context = f"Goal Title: {title}\nDescription: {description}\nDeadline: {deadline or 'None'}"
+        prompt_context = f"Goal Title: {title}\nDescription: {description}\nDeadline: {deadline or 'None'}\nContext/Syllabus: {context}"
 
         # We use Gemini (cloud) for this high-level reasoning task
         response_text = gemini_client.generate(
             system=self.system_prompt,
-            prompt=context,
+            prompt=prompt_context,
             temperature=0.3,
-            max_tokens=2048
+            max_tokens=4096,
+            response_mime_type="application/json"
         )
 
         # Parse the JSON response

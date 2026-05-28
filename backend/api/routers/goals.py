@@ -11,6 +11,7 @@ router = APIRouter(prefix="/api/goals", tags=["Goals"])
 class GoalRequest(BaseModel):
     title: str
     description: Optional[str] = ""
+    context: Optional[str] = ""
     deadline: Optional[str] = None
 
 
@@ -24,6 +25,7 @@ async def create_goal(request: GoalRequest):
         goal = goal_agent.create_goal(
             title=request.title,
             description=request.description,
+            context=request.context,
             deadline=request.deadline
         )
         return goal
@@ -52,5 +54,20 @@ async def get_goal(goal_id: str):
         return goal
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{goal_id}/replan", response_model=Goal)
+async def replan_goal(goal_id: str):
+    """
+    Trigger the Adaptive Replanner to conditionally reschedule uncompleted tasks.
+    """
+    try:
+        from backend.goals.replanner import replanner
+        updated_goal = replanner.adaptive_replan(goal_id)
+        return updated_goal
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

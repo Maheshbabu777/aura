@@ -33,6 +33,7 @@ class GoalStore:
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
             description TEXT,
+            context TEXT,
             status TEXT NOT NULL,
             progress_pct INTEGER NOT NULL,
             created_at DATETIME NOT NULL,
@@ -89,9 +90,9 @@ class GoalStore:
 
         # Insert Goal
         cursor.execute('''
-        INSERT OR REPLACE INTO goals (id, title, description, status, progress_pct, created_at, deadline)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (goal.id, goal.title, goal.description, goal.status, goal.progress_pct, goal.created_at, goal.deadline))
+        INSERT OR REPLACE INTO goals (id, title, description, context, status, progress_pct, created_at, deadline)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (goal.id, goal.title, goal.description, goal.context, goal.status, goal.progress_pct, goal.created_at, goal.deadline))
 
         for milestone in goal.milestones:
             # Insert Milestone

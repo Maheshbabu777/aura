@@ -25,19 +25,11 @@ class GeminiClient:
         prompt: str,
         system: Optional[str] = None,
         temperature: float = 0.7,
-        max_tokens: int = 1024,
+        max_tokens: int = 2048,
+        response_mime_type: Optional[str] = None
     ) -> str:
         """
         Generate text completion from Gemini.
-
-        Args:
-            prompt: User prompt
-            system: Optional system instruction (Gemini 1.5+ supports this)
-            temperature: Sampling temperature (0.0-1.0)
-            max_tokens: Maximum tokens to generate
-
-        Returns:
-            Generated text response
         """
         try:
             # Combine system and prompt if system provided
@@ -45,10 +37,14 @@ class GeminiClient:
             if system:
                 full_prompt = f"{system}\n\n{prompt}"
 
-            generation_config = genai.types.GenerationConfig(
-                temperature=temperature,
-                max_output_tokens=max_tokens,
-            )
+            generation_config_args = {
+                "temperature": temperature,
+                "max_output_tokens": max_tokens,
+            }
+            if response_mime_type:
+                generation_config_args["response_mime_type"] = response_mime_type
+
+            generation_config = genai.types.GenerationConfig(**generation_config_args)
 
             logger.info(f"Gemini request: {self.model_name} | prompt length: {len(full_prompt)}")
 

@@ -91,8 +91,35 @@ aura/
 │   ├── models/           # Pydantic schemas
 │   ├── prompts/          # System prompts (loaded at runtime)
 │   ├── config/           # Configuration management
-│   └── tests/            # Test suite
-│
+│   └── tests/            # Pytest test suite
+
+## Project Phases & Progress
+
+### Phase 1: Core OS Layer (Weeks 1-4)
+- ✅ Local & Cloud model routing (`models/`)
+- ✅ Conversation Memory & VectorDB (`agents/memory_agent.py`, `memory/`)
+- ✅ Intent Classification & Routing (`agents/orchestrator.py`)
+
+### Phase 2: Integrations (Weeks 5-8)
+- ✅ Email Triage Agent & Gmail Integration (`agents/email_triage.py`, `integrations/gmail.py`)
+- ✅ Google Calendar Integration (`integrations/calendar.py`)
+- ✅ Morning Brief Generator (`heartbeat/morning_brief.py`)
+- ✅ Guardrails & Approval Queue (`guardrails/`)
+- ⏭️ Week 8 Follow-Up Tracker (Skipped to prioritize Phase 3)
+
+### Phase 3: Goal Tracking (Weeks 9-11)
+#### Week 9: Goal Structure + Storage ✅
+- ✅ Designed 4-tier goal schema (`Goal -> Milestone -> WeeklyTask -> DailyAction`)
+- ✅ Built `GoalStore` with SQLite to store hierarchies
+- ✅ Built `GoalAgent` to decompose goals using Cloud Gemini
+- ✅ Exposed `/api/goals` FastAPI endpoints
+
+#### Week 10: Adaptive Replanning & Deep Context ✅
+- ✅ Added `context` field to Goals to hold large texts like Syllabi
+- ✅ Built `AdaptiveReplanner` to condense overdue tasks using Gemini Cloud
+- ✅ Exposed `/api/goals/{id}/replan` endpoint
+- ✅ Passing tests in `test_replanner.py`
+
 ├── tools/                # Validation and testing scripts
 │   ├── validate_tool_calling.py
 │   └── test_ollama.py
