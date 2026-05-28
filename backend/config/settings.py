@@ -15,11 +15,15 @@ class Settings(BaseSettings):
 
     # Google Gemini Configuration
     gemini_api_key: str
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-3.5-flash"
 
     # Memory Configuration
     memory_db_path: str = "./data/chromadb"
     audit_log_path: str = "./data/audit.db"
+
+    # Email Triage Configuration
+    email_triage_model: str = "gemma3:1b"  # Lightweight model for email classification
+    email_triage_use_cloud: bool = False  # Set True to use Gemini (privacy tradeoff)
 
     # Logging
     log_level: str = "INFO"

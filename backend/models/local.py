@@ -23,6 +23,7 @@ class OllamaClient:
         system: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 1024,
+        model_override: Optional[str] = None,
     ) -> str:
         """
         Generate text completion from Ollama.
@@ -32,14 +33,16 @@ class OllamaClient:
             system: Optional system prompt
             temperature: Sampling temperature (0.0-1.0)
             max_tokens: Maximum tokens to generate
+            model_override: Use a different model for this call (e.g. 'gemma3:1b')
 
         Returns:
             Generated text response
         """
         url = f"{self.base_url}/api/generate"
+        model = model_override or self.model
 
         payload = {
-            "model": self.model,
+            "model": model,
             "prompt": prompt,
             "stream": False,
             "options": {
@@ -55,7 +58,7 @@ class OllamaClient:
         # Let the model use its default token limit instead
 
         try:
-            logger.debug(f"Ollama request: {self.model} | prompt length: {len(prompt)}")
+            logger.debug(f"Ollama request: {model} | prompt length: {len(prompt)}")
             response = requests.post(url, json=payload, timeout=self.timeout)
             response.raise_for_status()
 

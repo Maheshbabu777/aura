@@ -11,6 +11,7 @@ from loguru import logger
 
 from backend.agents.orchestrator import OrchestratorAgent
 from backend.config.settings import settings
+from backend.api.routers import heartbeat
 
 
 # Configure logging
@@ -41,6 +42,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount routers
+app.include_router(heartbeat.router)
 
 
 # Initialize orchestrator (singleton)

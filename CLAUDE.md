@@ -19,12 +19,14 @@ AURA is a privacy-first, autonomous personal AI assistant that runs locally on c
 ### AI Models
 - **Local Model**: Gemma 4 E2B via Ollama (4-bit quantized, ~5GB RAM)
   - Model name: `gemma4:e2b`
-  - Used for: Tool calling, classification, routine tasks
+  - Used for: Simple classification, routine queries (speed not critical)
   - Base URL: `http://localhost:11434`
   - **Known Issue**: `num_predict` parameter causes empty responses - omit and use default token limits
-- **Cloud Model**: Gemini 3 Flash (Google AI API)
-  - Used for: Complex reasoning, brief generation
-  - Target cost: ~$0.24/year
+- **Cloud Model**: Gemini 3.5 Flash (Google AI API)
+  - Used for: Email triage, complex reasoning, brief generation, time-sensitive tasks
+  - Speed: <1 second per request (vs 5-10s local)
+  - Model name: `gemini-3.5-flash`
+  - Target cost: ~$0.50/year (increased from $0.24 due to email triage)
 
 ### Storage
 - **Vector DB**: ChromaDB 0.5.x (persistent, local)
@@ -142,14 +144,23 @@ aura/
 - Git repo initialized
 - Python environment set up
 
-### Week 1: LangGraph Validation + Tool Calling ✅
-- ✅ Installed dependencies
-- ✅ Created validation script with 20 test cases
-- ✅ Passed validation at 82.5% (threshold: 70%)
-- ✅ Simplified tool set (removed meta-classification tools)
-- ✅ Documented scoring rubric
+### Week 6: Google Calendar + Morning Brief ✅
+- ✅ Built Google Calendar API integration with OAuth 2.0
+- ✅ Morning Brief generator combining calendar, emails, and goals
+- ✅ Added `GeminiClient` parameter fixes for system instructions
+- ✅ Real Calendar testing with OAuth credentials
+- ✅ 6 new tests passing (3 calendar, 3 morning brief)
+- ✅ Exposed `/api/brief/generate` FastAPI endpoint
+
+**Key Features**:
+- Google Calendar API fetches today's and tomorrow's events
+- Morning Brief aggregates data and uses Gemini 3.5 Flash for Markdown formatting
+- Dynamic fetching of urgent emails directly via `EmailTriageAgent`
+- Structured prompt for Morning Brief generation
 
 **Key Decisions**:
+- Reused Google Cloud Project from Gmail for Calendar API (no new credentials file needed)
+- Opted for cloud Gemini for Morning Brief to ensure high-quality markdown generation, with a fallback available to local models.
 - Removed `classify_task` and `classify_action` tools (orchestrator handles classification internally)
 - Kept 6 core tools: store_memory, search_memory, update_memory, get_calendar, search_emails, schedule_reminder
 
@@ -204,21 +215,35 @@ aura/
 - ✅ Email triage agent with classification (urgent/normal/ignore)
 - ✅ Guardrails system with Green/Yellow/Red action rules
 - ✅ Store urgent email summaries in memory
-- ✅ 26 new tests passing (16 guardrails + 10 email triage)
+- ✅ 57 new tests passing (27 email filter + 14 email triage + 16 guardrails)
 - ✅ Real Gmail testing with OAuth credentials
 - ✅ Fixed Gemma E2B empty response bug (num_predict parameter issue)
+- ✅ Privacy-first email triage: two-stage local pipeline (rule engine + gemma3:1b)
 
 **Key Features**:
 - Gmail OAuth flow with token persistence (credentials/gmail_credentials.json + gmail_token.json)
-- Fetch and classify unread emails using Gemma E2B locally
+- Two-stage email triage pipeline (privacy-preserving):
+  - Stage 1: Rule-based pre-filter (handles ~60-70% of emails instantly, 0ms, no model)
+    - Sender pattern matching: noreply@, newsletter@, marketing@, etc. -> IGNORE
+    - Subject keyword matching: urgent, deadline, ASAP -> URGENT
+    - Configurable VIP sender list -> URGENT
+  - Stage 2: Local LLM (gemma3:1b via Ollama, ~1-2s per email, 100% private)
+    - Only called for ambiguous emails that pass through rule engine
+    - 5x lighter than Gemma E2B (~1GB vs ~5GB RAM)
+  - Cloud fallback: Gemini 3.5 Flash available via `email_triage_use_cloud=True` setting
 - Priority scoring (1-5) with reasoning
 - Automatic memory storage for urgent emails
+- Classification source tracking: `rule_engine`, `local_llm`, `cloud_llm`, `fallback`
 - Action classification: read (GREEN), draft (YELLOW), send (RED)
 - Tested with real Gmail account (mrwantsup@gmail.com)
 
 **Key Decisions**:
 - OAuth 2.0 consent screen in "Testing" mode with approved test users
-- Local Gemma E2B for email classification (cost-free, privacy-first)
+- Restored privacy-first principle: email triage uses local-only pipeline by default
+- Two-stage approach: rule engine for obvious emails, lightweight local LLM for ambiguous
+- gemma3:1b for email triage (fast, small, capable of simple classification)
+- Cloud Gemini is opt-in fallback only (not default) via `email_triage_use_cloud` setting
+- Added `model_override` param to OllamaClient.generate() for per-call model selection
 - Fixed: Removed num_predict from Ollama calls to avoid empty responses
 - Token auto-refresh with 180s timeout for slow networks
 
