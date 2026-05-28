@@ -206,22 +206,35 @@ aura/
 - ✅ Email triage agent with classification (urgent/normal/ignore)
 - ✅ Guardrails system with Green/Yellow/Red action rules
 - ✅ Store urgent email summaries in memory
-- ✅ 26 new tests passing (16 guardrails + 10 email triage)
+- ✅ 57 new tests passing (27 email filter + 14 email triage + 16 guardrails)
 - ✅ Real Gmail testing with OAuth credentials
 - ✅ Fixed Gemma E2B empty response bug (num_predict parameter issue)
+- ✅ Privacy-first email triage: two-stage local pipeline (rule engine + gemma3:1b)
 
 **Key Features**:
 - Gmail OAuth flow with token persistence (credentials/gmail_credentials.json + gmail_token.json)
-- Email classification using Gemini 3.5 Flash (switched from local Gemma E2B for speed)
+- Two-stage email triage pipeline (privacy-preserving):
+  - Stage 1: Rule-based pre-filter (handles ~60-70% of emails instantly, 0ms, no model)
+    - Sender pattern matching: noreply@, newsletter@, marketing@, etc. -> IGNORE
+    - Subject keyword matching: urgent, deadline, ASAP -> URGENT
+    - Configurable VIP sender list -> URGENT
+  - Stage 2: Local LLM (gemma3:1b via Ollama, ~1-2s per email, 100% private)
+    - Only called for ambiguous emails that pass through rule engine
+    - 5x lighter than Gemma E2B (~1GB vs ~5GB RAM)
+  - Cloud fallback: Gemini 3.5 Flash available via `email_triage_use_cloud=True` setting
 - Priority scoring (1-5) with reasoning
 - Automatic memory storage for urgent emails
+- Classification source tracking: `rule_engine`, `local_llm`, `cloud_llm`, `fallback`
 - Action classification: read (GREEN), draft (YELLOW), send (RED)
 - Tested with real Gmail account (mrwantsup@gmail.com)
 
 **Key Decisions**:
 - OAuth 2.0 consent screen in "Testing" mode with approved test users
-- Switched to Gemini 3.5 Flash for email triage (speed: <1s vs 5-10s local)
-- Trade-off: Privacy vs speed - email content sent to cloud for faster classification
+- Restored privacy-first principle: email triage uses local-only pipeline by default
+- Two-stage approach: rule engine for obvious emails, lightweight local LLM for ambiguous
+- gemma3:1b for email triage (fast, small, capable of simple classification)
+- Cloud Gemini is opt-in fallback only (not default) via `email_triage_use_cloud` setting
+- Added `model_override` param to OllamaClient.generate() for per-call model selection
 - Fixed: Removed num_predict from Ollama calls to avoid empty responses
 - Token auto-refresh with 180s timeout for slow networks
 
