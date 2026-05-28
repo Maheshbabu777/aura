@@ -6,7 +6,7 @@ from typing import Dict, Any, List
 from loguru import logger
 
 from backend.integrations.gmail import gmail_client
-from backend.models.local import ollama_client
+from backend.models.cloud import gemini_client
 from backend.agents.memory_agent import MemoryAgent
 
 
@@ -49,7 +49,7 @@ Guidelines:
 """
 
         try:
-            response = ollama_client.generate(
+            response = gemini_client.generate(
                 prompt=prompt,
                 temperature=0.3,  # Lower temp for consistent classification
                 max_tokens=256

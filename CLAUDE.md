@@ -19,12 +19,14 @@ AURA is a privacy-first, autonomous personal AI assistant that runs locally on c
 ### AI Models
 - **Local Model**: Gemma 4 E2B via Ollama (4-bit quantized, ~5GB RAM)
   - Model name: `gemma4:e2b`
-  - Used for: Tool calling, classification, routine tasks
+  - Used for: Simple classification, routine queries (speed not critical)
   - Base URL: `http://localhost:11434`
   - **Known Issue**: `num_predict` parameter causes empty responses - omit and use default token limits
-- **Cloud Model**: Gemini 3 Flash (Google AI API)
-  - Used for: Complex reasoning, brief generation
-  - Target cost: ~$0.24/year
+- **Cloud Model**: Gemini 3.5 Flash (Google AI API)
+  - Used for: Email triage, complex reasoning, brief generation, time-sensitive tasks
+  - Speed: <1 second per request (vs 5-10s local)
+  - Model name: `gemini-3.5-flash`
+  - Target cost: ~$0.50/year (increased from $0.24 due to email triage)
 
 ### Storage
 - **Vector DB**: ChromaDB 0.5.x (persistent, local)
@@ -210,7 +212,7 @@ aura/
 
 **Key Features**:
 - Gmail OAuth flow with token persistence (credentials/gmail_credentials.json + gmail_token.json)
-- Fetch and classify unread emails using Gemma E2B locally
+- Email classification using Gemini 3.5 Flash (switched from local Gemma E2B for speed)
 - Priority scoring (1-5) with reasoning
 - Automatic memory storage for urgent emails
 - Action classification: read (GREEN), draft (YELLOW), send (RED)
@@ -218,7 +220,8 @@ aura/
 
 **Key Decisions**:
 - OAuth 2.0 consent screen in "Testing" mode with approved test users
-- Local Gemma E2B for email classification (cost-free, privacy-first)
+- Switched to Gemini 3.5 Flash for email triage (speed: <1s vs 5-10s local)
+- Trade-off: Privacy vs speed - email content sent to cloud for faster classification
 - Fixed: Removed num_predict from Ollama calls to avoid empty responses
 - Token auto-refresh with 180s timeout for slow networks
 

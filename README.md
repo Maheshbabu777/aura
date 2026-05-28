@@ -49,13 +49,13 @@ AURA: "You work at TechCorp as a software engineer"
 AURA connects to your Gmail account and automatically classifies emails:
 
 - **OAuth 2.0 Flow**: Secure authentication with token persistence
-- **AI Classification**: Local Gemma model classifies each email as urgent/normal/ignore
+- **AI Classification**: Gemini 3.5 Flash classifies each email as urgent/normal/ignore (<1s per email)
 - **Priority Scoring**: Assigns 1-5 priority with reasoning
 - **Smart Summaries**: Urgent emails are automatically summarized and stored in memory
 
 **How it works:**
 1. AURA fetches unread emails from your Gmail
-2. For each email, Gemma E2B reads subject/sender/preview
+2. For each email, Gemini 3.5 Flash reads subject/sender/preview
 3. Classifies as URGENT (deadlines, meetings), NORMAL (updates), or IGNORE (newsletters)
 4. Urgent emails are flagged and their summaries stored for quick recall
 
@@ -92,13 +92,14 @@ REST API with endpoints for:
 
 ### AI Models
 - **Gemma 4 E2B (Local)**: 7.2GB quantized model via Ollama
-  - Used for: Email classification, intent detection, routine queries
+  - Used for: Simple classification, routine queries (speed not critical)
   - Cost: Free (runs on your machine)
   - Privacy: 100% local, no data sent to cloud
   
-- **Gemini 3 Flash (Cloud)**: Google AI API
-  - Used for: Complex reasoning, goal decomposition, planning
-  - Cost: ~$0.24/year (only called when needed)
+- **Gemini 3.5 Flash (Cloud)**: Google AI API
+  - Used for: Email triage, complex reasoning, goal decomposition, time-sensitive tasks
+  - Cost: ~$0.50/year (only called when needed)
+  - Speed: <1 second per request (vs 5-10s local)
 
 ### Backend Stack
 - **Python 3.11+**: Core runtime

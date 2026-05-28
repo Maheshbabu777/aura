@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     # Google Gemini Configuration
     gemini_api_key: str
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-3.5-flash"
 
     # Memory Configuration
     memory_db_path: str = "./data/chromadb"
