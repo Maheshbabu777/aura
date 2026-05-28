@@ -17,9 +17,11 @@ class Settings(BaseSettings):
     gemini_api_key: str
     gemini_model: str = "gemini-3.5-flash"
 
-    # Memory Configuration
+    # Database paths
     memory_db_path: str = "./data/chromadb"
+    sqlite_db_path: str = "./data/memory.db"
     audit_log_path: str = "./data/audit.db"
+    goal_db_path: str = "./data/goals.db"
 
     # Email Triage Configuration
     email_triage_model: str = "gemma3:1b"  # Lightweight model for email classification
