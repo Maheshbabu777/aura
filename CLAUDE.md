@@ -144,14 +144,23 @@ aura/
 - Git repo initialized
 - Python environment set up
 
-### Week 1: LangGraph Validation + Tool Calling ✅
-- ✅ Installed dependencies
-- ✅ Created validation script with 20 test cases
-- ✅ Passed validation at 82.5% (threshold: 70%)
-- ✅ Simplified tool set (removed meta-classification tools)
-- ✅ Documented scoring rubric
+### Week 6: Google Calendar + Morning Brief ✅
+- ✅ Built Google Calendar API integration with OAuth 2.0
+- ✅ Morning Brief generator combining calendar, emails, and goals
+- ✅ Added `GeminiClient` parameter fixes for system instructions
+- ✅ Real Calendar testing with OAuth credentials
+- ✅ 6 new tests passing (3 calendar, 3 morning brief)
+- ✅ Exposed `/api/brief/generate` FastAPI endpoint
+
+**Key Features**:
+- Google Calendar API fetches today's and tomorrow's events
+- Morning Brief aggregates data and uses Gemini 3.5 Flash for Markdown formatting
+- Dynamic fetching of urgent emails directly via `EmailTriageAgent`
+- Structured prompt for Morning Brief generation
 
 **Key Decisions**:
+- Reused Google Cloud Project from Gmail for Calendar API (no new credentials file needed)
+- Opted for cloud Gemini for Morning Brief to ensure high-quality markdown generation, with a fallback available to local models.
 - Removed `classify_task` and `classify_action` tools (orchestrator handles classification internally)
 - Kept 6 core tools: store_memory, search_memory, update_memory, get_calendar, search_emails, schedule_reminder
 
