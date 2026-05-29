@@ -1,5 +1,5 @@
 """
-Tests for OrchestratorAgent.
+Tests for OrchestratorAgent with ConversationSession.
 """
 
 import pytest
@@ -14,8 +14,12 @@ def orchestrator():
     with patch("backend.agents.orchestrator.MemoryAgent") as mock_memory:
         mock_memory_instance = Mock()
         orch = OrchestratorAgent(memory_agent=mock_memory_instance)
+        # Reset session state between tests
+        orch.session.reset()
         return orch
 
+
+# ── Classification Parsing Tests ────────────────────────────────────────
 
 def test_parse_classification_valid(orchestrator):
     """Test parsing valid classification response."""
@@ -48,6 +52,8 @@ def test_parse_classification_missing_fields(orchestrator):
     assert result["entities"] == []
     assert result["reasoning"] == ""
 
+
+# ── Intent Classification Tests ─────────────────────────────────────────
 
 def test_classify_intent_local(orchestrator):
     """Test intent classification using local model."""
@@ -82,6 +88,45 @@ def test_classify_intent_cloud(orchestrator):
         assert result["agent"] == "goal_agent"
         assert mock_gemini.generate.called
 
+
+def test_classify_intent_includes_history(orchestrator):
+    """Test that classify_intent includes recent conversation context."""
+    # Simulate existing conversation in session
+    orchestrator.session.add_user_message("What did I do today?")
+    orchestrator.session.add_assistant_message("You completed 3 tasks. Options: 1) Review, 2) Plan, 3) Skip")
+    orchestrator.session.add_user_message("option 2")
+
+    with patch("backend.agents.orchestrator.ollama_client") as mock_ollama:
+        mock_ollama.generate.return_value = """
+        INTENT: follow_up
+        AGENT: conversational
+        ENTITIES: none
+        REASONING: User is selecting option from previous response
+        """
+
+        result = orchestrator.classify_intent("option 2")
+
+        # Verify context was included in the prompt
+        call_args = mock_ollama.generate.call_args
+        prompt = call_args.kwargs.get("prompt", "")
+        assert "conversation" in prompt.lower() or "AURA" in prompt
+
+
+def test_classify_intent_error_handling(orchestrator):
+    """Test graceful error handling when both local and cloud fail."""
+    with patch("backend.agents.orchestrator.ollama_client") as mock_ollama, \
+         patch("backend.agents.orchestrator.gemini_client") as mock_gemini:
+        mock_ollama.generate.side_effect = Exception("Connection error")
+        mock_gemini.generate.side_effect = Exception("Cloud fallback error")
+
+        result = orchestrator.classify_intent("Test message")
+
+    assert result["intent"] == "general_chat"
+    assert result["agent"] == "none"
+    assert "fallback failed" in result["reasoning"].lower()
+
+
+# ── Routing Tests ───────────────────────────────────────────────────────
 
 def test_route_memory_store(orchestrator):
     """Test routing memory store request."""
@@ -122,59 +167,48 @@ def test_route_memory_search(orchestrator):
         assert "TechCorp" in result["message"]
 
 
-def test_route_not_implemented_agent(orchestrator):
-    """Test routing to not-yet-implemented agent."""
+def test_route_goal_goes_conversational(orchestrator):
+    """Test that goal_agent routes to conversational handler (since it's not standalone yet)."""
     with patch.object(orchestrator, "classify_intent") as mock_classify:
         mock_classify.return_value = {
             "intent": "goal_request",
             "agent": "goal_agent",
             "entities": [],
-            "reasoning": "Goal tracking not implemented",
+            "reasoning": "Goal tracking",
         }
 
-        result = orchestrator.route("I want to become an ML engineer")
+        with patch.object(orchestrator, "_handle_conversational") as mock_conv:
+            mock_conv.return_value = {
+                "success": True,
+                "message": "Let's talk about your goals!",
+                "intent": "conversational",
+                "agent": "conversational",
+            }
 
-        assert result["success"] == False
-        assert "not yet implemented" in result["message"].lower()
-        assert result["agent"] == "goal_agent"
+            result = orchestrator.route("I want to become an ML engineer")
+
+            assert result["success"] == True
+            mock_conv.assert_called_once()
 
 
-def test_route_general_chat_greeting(orchestrator):
-    """Test routing simple greeting."""
+def test_route_status_agent(orchestrator):
+    """Test routing status request returns intercept marker."""
     with patch.object(orchestrator, "classify_intent") as mock_classify:
         mock_classify.return_value = {
-            "intent": "general_chat",
-            "agent": "none",
+            "intent": "status_request",
+            "agent": "status_agent",
             "entities": [],
-            "reasoning": "Simple greeting",
+            "reasoning": "User wants daily status",
         }
 
-        result = orchestrator.route("Hello")
+        result = orchestrator.route("What did I do today?")
 
-        assert result["success"] == True
-        assert result["intent"] == "general_chat"
-        assert "AURA" in result["message"]
-
-
-def test_route_general_chat_thanks(orchestrator):
-    """Test routing thank you message."""
-    with patch.object(orchestrator, "classify_intent") as mock_classify:
-        mock_classify.return_value = {
-            "intent": "general_chat",
-            "agent": "none",
-            "entities": [],
-            "reasoning": "Expressing gratitude",
-        }
-
-        result = orchestrator.route("Thank you!")
-
-        assert result["success"] == True
-        assert result["intent"] == "general_chat"
-        assert "welcome" in result["message"].lower()
+        assert result["message"] == "[INTERCEPT_STATUS_REQUEST]"
+        assert result["agent"] == "status_agent"
 
 
-def test_route_general_chat_complex(orchestrator):
-    """Test routing complex conversational message."""
+def test_route_general_chat(orchestrator):
+    """Test routing general chat goes to conversational handler."""
     with patch.object(orchestrator, "classify_intent") as mock_classify:
         mock_classify.return_value = {
             "intent": "general_chat",
@@ -183,14 +217,18 @@ def test_route_general_chat_complex(orchestrator):
             "reasoning": "General conversation",
         }
 
-        with patch("backend.agents.orchestrator.gemini_client") as mock_gemini:
-            mock_gemini.generate.return_value = "I can help you with that!"
+        with patch.object(orchestrator, "_handle_conversational") as mock_conv:
+            mock_conv.return_value = {
+                "success": True,
+                "message": "Hello! I'm AURA.",
+                "intent": "conversational",
+                "agent": "conversational",
+            }
 
-            result = orchestrator.route("Tell me about your capabilities")
+            result = orchestrator.route("Hello")
 
             assert result["success"] == True
-            assert result["intent"] == "general_chat"
-            mock_gemini.generate.called
+            mock_conv.assert_called_once()
 
 
 def test_route_memory_agent_error(orchestrator):
@@ -211,17 +249,93 @@ def test_route_memory_agent_error(orchestrator):
         assert "error" in result["message"].lower()
 
 
-def test_classify_intent_error_handling(orchestrator):
-    """Test graceful error handling in classification."""
-    with patch("backend.agents.orchestrator.ollama_client") as mock_ollama:
-        mock_ollama.generate.side_effect = Exception("Connection error")
+# ── Sticky Routing Tests ────────────────────────────────────────────────
 
-        result = orchestrator.classify_intent("Test message")
+def test_sticky_routing_follow_up(orchestrator):
+    """Test that sticky routing sends follow-ups to conversational handler."""
+    # Simulate: an agent is already active
+    orchestrator.session.set_active_agent("conversational")
+    orchestrator.session.add_user_message("What did I do today?")
+    orchestrator.session.add_assistant_message("You completed 3 tasks.")
 
-        assert result["intent"] == "error"
-        assert result["agent"] == "none"
-        assert "error" in result["reasoning"].lower()
+    with patch.object(orchestrator, "_handle_conversational") as mock_conv, \
+         patch.object(orchestrator, "classify_intent") as mock_classify:
+        mock_conv.return_value = {
+            "success": True,
+            "message": "Option 2 is the fastest.",
+            "intent": "conversational",
+            "agent": "conversational",
+        }
 
+        result = orchestrator.route("Which option is fastest?")
+
+        # Verify sticky routing bypassed the classifier
+        mock_classify.assert_not_called()
+        mock_conv.assert_called_once()
+        assert result["success"] == True
+
+
+def test_sticky_routing_timeout(orchestrator):
+    """Test that sticky routing releases after timeout."""
+    from datetime import datetime, timedelta
+
+    orchestrator.session.set_active_agent("conversational")
+    # Simulate timeout by setting last_activity far in the past
+    orchestrator.session.last_activity = datetime.now() - timedelta(seconds=300)
+
+    assert orchestrator.session.has_active_agent() == False
+    assert orchestrator.session.active_agent is None
+
+
+def test_follow_up_intent(orchestrator):
+    """Test that follow_up intent routes to conversational handler."""
+    with patch.object(orchestrator, "classify_intent") as mock_classify:
+        mock_classify.return_value = {
+            "intent": "follow_up",
+            "agent": "conversational",
+            "entities": [],
+            "reasoning": "User is following up on previous response",
+        }
+
+        with patch.object(orchestrator, "_handle_conversational") as mock_conv:
+            mock_conv.return_value = {
+                "success": True,
+                "message": "Sure, option 2 it is!",
+                "intent": "conversational",
+                "agent": "conversational",
+            }
+
+            result = orchestrator.route("option 2")
+
+            assert result["success"] == True
+            mock_conv.assert_called_once()
+
+
+# ── Session Tests ───────────────────────────────────────────────────────
+
+def test_session_history_tracking(orchestrator):
+    """Test that session tracks conversation history."""
+    orchestrator.session.add_user_message("Hello")
+    orchestrator.session.add_assistant_message("Hi there!")
+
+    history = orchestrator.session.get_full_history()
+    assert len(history) == 2
+    assert history[0]["role"] == "user"
+    assert history[1]["role"] == "assistant"
+
+
+def test_session_sliding_window(orchestrator):
+    """Test that session trims history to max_messages."""
+    # Add more messages than the max (8 turns = 16 messages)
+    for i in range(20):
+        orchestrator.session.add_user_message(f"User message {i}")
+        orchestrator.session.add_assistant_message(f"Assistant response {i}")
+
+    history = orchestrator.session.get_full_history()
+    assert len(history) == orchestrator.session.max_messages
+
+
+# ── Utility Tests ───────────────────────────────────────────────────────
 
 def test_load_prompt(orchestrator):
     """Test that prompt loads correctly from file."""
@@ -229,6 +343,7 @@ def test_load_prompt(orchestrator):
     assert len(orchestrator.system_prompt) > 0
     assert "Orchestrator Agent" in orchestrator.system_prompt
     assert "memory_agent" in orchestrator.system_prompt
+    assert "follow_up" in orchestrator.system_prompt
 
 
 def test_complex_intents_tracking(orchestrator):

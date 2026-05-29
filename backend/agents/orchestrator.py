@@ -1,27 +1,41 @@
 """
 Orchestrator Agent: Routes user input to specialized agents.
+
+Architecture (Production-Standard Conversation Engine):
+1. Session checks sticky routing (is an agent already handling this conversation?)
+2. If not, classify intent WITH conversation context
+3. Route to the appropriate agent WITH full history
+4. Set active_agent for follow-up handling
+
+Key design decisions:
+- Session state is managed by chat.py (the API layer), not internally
+- The orchestrator reads session state but only chat.py writes to it
+- Full conversation history is passed to cloud agents (Gemini)
+- Compact recent context is passed to the local intent classifier (Gemma)
+- Sticky routing prevents unnecessary re-classification of follow-ups
 """
 
 import re
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from loguru import logger
 
 from backend.models.local import ollama_client
 from backend.models.cloud import gemini_client
 from backend.agents.memory_agent import MemoryAgent
+from backend.conversation.session import ConversationSession
 
 
 class OrchestratorAgent:
     """
     Routes user requests to appropriate specialized agents.
-    Uses local model (Gemma) for simple classification,
-    escalates to cloud model (Gemini) for complex reasoning.
+    Uses ConversationSession for stateful, context-aware routing.
     """
 
     def __init__(self, memory_agent: Optional[MemoryAgent] = None):
         self.memory_agent = memory_agent or MemoryAgent()
         self.system_prompt = self._load_prompt()
+        self.session = ConversationSession(max_turns=8, timeout_seconds=180)
 
         # Track which intents need cloud reasoning
         self.complex_intents = {"goal_request", "task_request"}
@@ -70,15 +84,31 @@ class OrchestratorAgent:
     def classify_intent(self, user_message: str, use_cloud: bool = False) -> Dict[str, str]:
         """
         Classify user intent using local or cloud model.
-
-        Args:
-            user_message: User's input text
-            use_cloud: Force use of Gemini instead of Gemma
-
-        Returns:
-            Classification dict with intent, agent, entities, reasoning
+        Includes recent conversation context for accurate follow-up detection.
         """
-        prompt = f"User message: {user_message}"
+        # Build prompt with conversation context
+        prompt = ""
+
+        # Include recent conversation history (last 3 turns, excluding current message)
+        # The current message was already added to session by chat.py before route() is called
+        history = self.session.history
+        # Get history excluding the last message (the current user message)
+        context_history = history[:-1] if len(history) > 0 else []
+        # Take last 6 messages (3 turns) of context
+        recent = context_history[-6:] if len(context_history) >= 6 else context_history
+
+        if recent:
+            prompt += "Recent conversation:\n"
+            for msg in recent:
+                role = "User" if msg["role"] == "user" else "AURA"
+                # Truncate long messages to keep the classifier prompt manageable
+                content = msg["content"][:300]
+                if len(msg["content"]) > 300:
+                    content += "..."
+                prompt += f"  {role}: {content}\n"
+            prompt += "\n"
+
+        prompt += f"User message: {user_message}"
 
         try:
             if use_cloud:
@@ -104,33 +134,60 @@ class OrchestratorAgent:
             return classification
 
         except Exception as e:
-            logger.error(f"Intent classification failed: {e}")
-            return {
-                "intent": "error",
-                "agent": "none",
-                "entities": [],
-                "reasoning": f"Classification error: {str(e)}",
-            }
+            logger.error(f"Intent classification failed with local model: {e}")
+            logger.info("Attempting fallback to Cloud Gemini for intent classification...")
+            try:
+                # Fallback to cloud model
+                response = gemini_client.generate(
+                    prompt=prompt,
+                    system=self.system_prompt,
+                    temperature=0.0,
+                    max_tokens=150,
+                )
+                return self._parse_classification(response)
+            except Exception as cloud_e:
+                logger.error(f"Intent classification fallback failed: {cloud_e}")
+                return {
+                    "intent": "general_chat",
+                    "agent": "none",
+                    "entities": [],
+                    "reasoning": "Fallback failed",
+                }
 
     def route(self, user_message: str) -> Dict[str, Any]:
         """
-        Main routing function: classify intent and delegate to appropriate agent.
+        Main routing function with sticky routing and full conversation context.
 
-        Args:
-            user_message: User's input text
+        Flow:
+        1. Check sticky routing (active agent?) → route directly
+        2. Classify intent with conversation context
+        3. Route to appropriate agent
+        4. Return result (chat.py handles session updates)
 
-        Returns:
-            Response dict with agent_response and metadata
+        NOTE: chat.py adds the user message to session BEFORE calling this method,
+        and adds the assistant response AFTER. This method does NOT modify session state.
         """
         logger.info(f"Orchestrator received: {user_message[:100]}...")
 
-        # Step 1: Classify intent
-        classification = self.classify_intent(user_message)
+        # ── Step 0: Sticky Routing ──────────────────────────────────────
+        if self.session.has_active_agent():
+            active = self.session.active_agent
+            logger.info(f"Sticky routing → '{active}' (follow-up detected)")
 
+            # All follow-ups go through the conversational handler
+            # Gemini with full history naturally understands context
+            return self._handle_conversational(user_message)
+
+        # ── Step 1: Classify Intent ─────────────────────────────────────
+        classification = self.classify_intent(user_message)
         intent = classification["intent"]
         agent = classification["agent"]
 
-        # Step 2: Handle not-implemented agents
+        # ── Step 1b: Handle follow_up intent ────────────────────────────
+        if intent == "follow_up" or agent == "conversational":
+            return self._handle_conversational(user_message)
+
+        # ── Step 2: Handle not-implemented agents ───────────────────────
         if agent == "not_implemented":
             return {
                 "success": False,
@@ -139,27 +196,101 @@ class OrchestratorAgent:
                 "agent": agent,
             }
 
-        # Step 3: Route to appropriate agent
+        # ── Step 3: Route to appropriate agent ──────────────────────────
         if agent == "memory_agent":
             return self._route_to_memory_agent(user_message, intent, classification)
 
-        elif agent in ["goal_agent", "task_agent", "research_agent"]:
+        elif agent in ["goal_agent", "task_agent"]:
+            # Not yet implemented as standalone agents — handle conversationally
+            # Gemini with full history can still discuss goals/tasks intelligently
+            return self._handle_conversational(user_message)
+            
+        elif agent == "research_agent":
+            # ResearchAgent is async — return intercept marker for chat.py
             return {
-                "success": False,
-                "message": f"{agent} is not yet implemented.",
+                "success": True,
+                "message": "[INTERCEPT_RESEARCH_REQUEST]",
                 "intent": intent,
                 "agent": agent,
             }
 
-        elif intent == "general_chat":
-            return self._handle_general_chat(user_message)
+        elif agent == "status_agent":
+            # StatusAgent is async — return intercept marker for chat.py
+            return {
+                "success": True,
+                "message": "[INTERCEPT_STATUS_REQUEST]",
+                "intent": intent,
+                "agent": agent,
+            }
+
+        # ── Step 4: General chat / fallback ─────────────────────────────
+        elif intent == "general_chat" or agent == "none":
+            return self._handle_conversational(user_message)
 
         else:
             return {
                 "success": False,
-                "message": "Could not determine how to handle this request.",
+                "message": "I understood your request, but the specific agent to handle it is not available.",
                 "intent": intent,
                 "agent": agent,
+            }
+
+    # ── Agent Handlers ──────────────────────────────────────────────────
+
+    def _handle_conversational(self, user_message: str) -> Dict[str, Any]:
+        """
+        Handle messages conversationally using Gemini with FULL conversation history.
+
+        This is the primary handler for:
+        - Follow-up messages ("option 2", "tell me more")
+        - General chat
+        - Agents not yet implemented (goals, tasks, research)
+
+        Gemini receives the entire conversation history and naturally understands context.
+        """
+        history = self.session.get_full_history()
+
+        # Build messages for Gemini chat API
+        messages = []
+
+        # System context as the opening exchange
+        messages.append({
+            "role": "user",
+            "content": (
+                "You are AURA, a personal AI assistant. You help users with their "
+                "daily productivity, goals, tasks, and life management. Be conversational, "
+                "helpful, and concise. If the user refers to options, suggestions, or anything "
+                "from a previous message, use the conversation history to understand what they mean. "
+                "Always respond naturally as if you remember the entire conversation."
+            ),
+        })
+        messages.append({
+            "role": "assistant",
+            "content": "Understood. I'm AURA, your personal AI assistant. I'm ready to help.",
+        })
+
+        # Add full conversation history (already includes current user message)
+        messages.extend(history)
+
+        try:
+            response = gemini_client.chat(
+                messages=messages,
+                temperature=0.7,
+                max_tokens=512,
+            )
+            return {
+                "success": True,
+                "message": response,
+                "intent": "conversational",
+                "agent": "conversational",
+            }
+        except Exception as e:
+            logger.error(f"Conversational handler failed: {e}")
+            return {
+                "success": False,
+                "message": f"I'm sorry, I'm having trouble responding right now. Please try again.",
+                "intent": "conversational",
+                "agent": "conversational",
             }
 
     def _route_to_memory_agent(
@@ -187,29 +318,11 @@ class OrchestratorAgent:
                 "agent": "memory_agent",
             }
 
-    def _handle_general_chat(self, user_message: str) -> Dict[str, Any]:
-        """Handle general conversational messages."""
-        # Simple responses for common greetings
-        message_lower = user_message.lower().strip()
+    # Legacy compatibility — tests may still call this directly
+    def _handle_general_chat(self, user_message: str, chat_history=None) -> Dict[str, Any]:
+        """Legacy handler — redirects to _handle_conversational."""
+        return self._handle_conversational(user_message)
 
-        if any(greeting in message_lower for greeting in ["hello", "hi", "hey"]):
-            response = "Hello! I'm AURA, your personal AI assistant. How can I help you today?"
-        elif any(word in message_lower for word in ["thanks", "thank you"]):
-            response = "You're welcome! Let me know if you need anything else."
-        elif any(word in message_lower for word in ["bye", "goodbye"]):
-            response = "Goodbye! Feel free to come back anytime."
-        else:
-            # Use Gemini for more complex conversational responses
-            response = gemini_client.generate(
-                prompt=user_message,
-                system="You are AURA, a helpful personal AI assistant. Respond conversationally and concisely.",
-                temperature=0.7,
-                max_tokens=256,
-            )
 
-        return {
-            "success": True,
-            "message": response,
-            "intent": "general_chat",
-            "agent": "none",
-        }
+# Singleton instance
+orchestrator = OrchestratorAgent()

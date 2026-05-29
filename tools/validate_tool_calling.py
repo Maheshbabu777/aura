@@ -234,7 +234,7 @@ TEST_CASES = [
 def call_ollama(prompt: str, model: str = None) -> Dict[str, Any]:
     """Call Ollama API with the given prompt."""
     if model is None:
-        model = os.getenv("OLLAMA_MODEL", "gemma4:e2b")
+        model = os.getenv("OLLAMA_MODEL", "gemma3:1b")
 
     url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434") + "/api/generate"
 
@@ -361,7 +361,7 @@ def score_response(test_case: Dict, llm_response: Dict) -> Dict[str, Any]:
 
 def run_validation() -> Dict[str, Any]:
     """Run the full validation suite."""
-    model_name = os.getenv("OLLAMA_MODEL", "gemma4:e2b")
+    model_name = os.getenv("OLLAMA_MODEL", "gemma3:1b")
 
     print("=" * 60)
     print("AURA Tool Calling Validation Test")
@@ -401,7 +401,7 @@ def run_validation() -> Dict[str, Any]:
 
     summary = {
         "timestamp": datetime.now().isoformat(),
-        "model": os.getenv("OLLAMA_MODEL", "gemma4:e2b"),
+        "model": os.getenv("OLLAMA_MODEL", "gemma3:1b"),
         "total_cases": len(TEST_CASES),
         "total_score": total_score,
         "max_possible_score": len(TEST_CASES) * 10,

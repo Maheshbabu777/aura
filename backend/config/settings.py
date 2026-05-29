@@ -11,11 +11,18 @@ class Settings(BaseSettings):
 
     # Ollama Configuration
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "gemma4:e2b"
+    ollama_model: str = "gemma3:1b"
 
     # Google Gemini Configuration
     gemini_api_key: str
     gemini_model: str = "gemini-3.5-flash"
+
+    # Groq Configuration (Fast intent routing)
+    groq_api_key: Optional[str] = None
+    groq_model: str = "gemma2-9b-it"
+
+    # Composio Configuration
+    composio_api_key: Optional[str] = None
 
     # Database paths
     memory_db_path: str = "./data/chromadb"

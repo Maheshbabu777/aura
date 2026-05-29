@@ -3,6 +3,9 @@ Ollama client for local Gemma 4 E4B model.
 """
 
 import requests
+import subprocess
+import time
+import os
 from typing import Dict, Any, Optional, List
 from loguru import logger
 
@@ -72,8 +75,24 @@ class OllamaClient:
             logger.error(f"Ollama request timeout after {self.timeout}s")
             raise
         except requests.exceptions.RequestException as e:
-            logger.error(f"Ollama request failed: {e}")
-            raise
+            if "10061" in str(e) or "Connection refused" in str(e):
+                logger.warning("Ollama is not running. Attempting to auto-start 'ollama serve'...")
+                try:
+                    # Windows specific flag to prevent command window popup
+                    creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                    subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
+                    time.sleep(4)  # Wait for server to bind
+                    
+                    logger.info("Retrying Ollama request after auto-start...")
+                    response = requests.post(url, json=payload, timeout=self.timeout)
+                    response.raise_for_status()
+                    return response.json().get("response", "")
+                except Exception as start_e:
+                    logger.error(f"Failed to auto-start Ollama: {start_e}")
+                    raise e
+            else:
+                logger.error(f"Ollama request failed: {e}")
+                raise
 
     def chat(
         self,

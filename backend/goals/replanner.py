@@ -12,6 +12,7 @@ from backend.config.settings import settings
 from backend.models.cloud import gemini_client
 from backend.goals.models import Goal, WeeklyTask
 from backend.goals.store import goal_store
+from backend.memory.activity_stream import activity_stream
 
 
 class AdaptiveReplanner:
@@ -120,6 +121,9 @@ class AdaptiveReplanner:
         conn.close()
 
         logger.info(f"Successfully replanned goal {goal.id}")
+        
+        # Log to Activity Stream
+        activity_stream.log("AdaptiveReplanner", f"Replanned goal: '{goal.title}' due to missed tasks.")
         
         # Fetch the fresh goal state from DB
         return goal_store.get_goal(goal.id)

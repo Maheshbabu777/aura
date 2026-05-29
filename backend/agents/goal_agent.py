@@ -11,6 +11,7 @@ from loguru import logger
 from backend.models.cloud import gemini_client
 from backend.goals.models import Goal, Milestone, WeeklyTask
 from backend.goals.store import goal_store
+from backend.memory.activity_stream import activity_stream
 
 
 class GoalAgent:
@@ -99,6 +100,9 @@ class GoalAgent:
         # Save to SQLite
         goal_store.save_goal(goal)
         logger.info(f"Successfully created and saved goal '{title}' with {len(milestones)} milestones.")
+        
+        # Log to Activity Stream
+        activity_stream.log("GoalAgent", f"Created new goal: '{goal.title}' with {len(goal.milestones)} milestones.")
         
         return goal
 

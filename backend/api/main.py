@@ -9,9 +9,8 @@ from typing import Dict, Any
 from pathlib import Path
 from loguru import logger
 
-from backend.agents.orchestrator import OrchestratorAgent
 from backend.config.settings import settings
-from backend.api.routers import heartbeat, actions, goals
+from backend.api.routers import heartbeat, actions, goals, chat
 
 
 # Configure logging
@@ -47,23 +46,10 @@ app.add_middleware(
 app.include_router(heartbeat.router)
 app.include_router(actions.router)
 app.include_router(goals.router)
+app.include_router(chat.router)
 
 
-# Initialize orchestrator (singleton)
-orchestrator = OrchestratorAgent()
-
-
-# Request/Response models
-class ChatRequest(BaseModel):
-    message: str
-
-
-class ChatResponse(BaseModel):
-    success: bool
-    message: str
-    intent: str
-    agent: str
-    metadata: Dict[str, Any] = {}
+# Orchestrator is now a singleton in its own file
 
 
 @app.on_event("startup")
@@ -89,35 +75,6 @@ async def root():
         "version": "0.1.0",
     }
 
-
-@app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    """
-    Main chat endpoint: routes user message through orchestrator.
-
-    Args:
-        request: ChatRequest with user message
-
-    Returns:
-        ChatResponse with agent's response and metadata
-    """
-    try:
-        logger.info(f"Chat request: {request.message[:100]}...")
-
-        # Route through orchestrator
-        result = orchestrator.route(request.message)
-
-        return ChatResponse(
-            success=result["success"],
-            message=result["message"],
-            intent=result["intent"],
-            agent=result["agent"],
-            metadata=result.get("classification", {}),
-        )
-
-    except Exception as e:
-        logger.error(f"Chat endpoint error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/logs")

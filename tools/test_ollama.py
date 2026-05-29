@@ -7,7 +7,7 @@ load_dotenv()
 
 def test_ollama():
     url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434") + "/api/generate"
-    model = os.getenv("OLLAMA_MODEL", "gemma4:e2b")
+    model = os.getenv("OLLAMA_MODEL", "gemma3:1b")
 
     print(f"Testing Ollama at {url}")
     print(f"Using model: {model}")
